@@ -30,7 +30,7 @@ jobs:
       - name: Check if release exists
         id: check-release
         env:
-          GH_TOKEN: ${{ secrets.PAT }} # Use a Personal Access Token (PAT)
+          GH_TOKEN: ${{ github.token }} # Use the default GITHUB_TOKEN
         run: |
           RELEASE_EXISTS=$(gh release view ${{ steps.version.outputs.version }} --json url -q '.url' 2>/dev/null || echo "false")
           if [ "$RELEASE_EXISTS" != "false" ]; then
@@ -44,6 +44,6 @@ jobs:
       - name: Draft new release
         if: steps.check-release.outputs.release_exists == 'false'
         env:
-          GH_TOKEN: ${{ secrets.PAT }} # Use a Personal Access Token (PAT)
+          GH_TOKEN: ${{ github.token }} # Use the default GITHUB_TOKEN
         run: |
           gh release create ${{ steps.version.outputs.version }} --title "Release ${{ steps.version.outputs.version }}" --draft --notes "Automated release created by GitHub Actions"
