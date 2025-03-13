@@ -10,9 +10,10 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  check-version-exists:
+  check-version-greater:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +23,7 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y gh
+          sudo apt-get install -y gh jq
 
       - name: Get version from package.json
         id: version
@@ -30,12 +31,38 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Check if release exists
+      - name: Get latest GitHub release version
+        id: latest-release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_EXISTS=$(gh release view ${{ steps.version.outputs.version }} --json url -q '.url' 2>/dev/null || echo "false")
-          if [ "$RELEASE_EXISTS" != "false" ]; then
-            echo "❌ Release ${{ steps.version.outputs.version }} already exists. Please update the version in package.json."
+          LATEST_VERSION=$(gh release list --json tagName --jq '.[0].tagName' 2>/dev/null || echo "0.0.0")
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: compare
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          LATEST_VERSION="${{ steps.latest-release.outputs.latest_version }}"
+          
+          # Convert versions to sortable numbers
+          VERSION_NUM=$(echo "$VERSION" | awk -F. '{ printf("%d%03d%03d\n", $1, $2, $3) }')
+          LATEST_VERSION_NUM=$(echo "$LATEST_VERSION" | awk -F. '{ printf("%d%03d%03d\n", $1, $2, $3) }')
+
+          echo "Package Version: $VERSION ($VERSION_NUM)"
+          echo "Latest Release: $LATEST_VERSION ($LATEST_VERSION_NUM)"
+
+          if [ "$VERSION_NUM" -le "$LATEST_VERSION_NUM" ]; then
+            echo "❌ The version in package.json ($VERSION) is not greater than the latest release ($LATEST_VERSION)."
+            echo "merge_block=true" >> $GITHUB_OUTPUT
             exit 1
+          else
+            echo "✅ The version in package.json ($VERSION) is valid."
+            echo "merge_block=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Block Merge (If Version is Not Greater)
+        if: steps.compare.outputs.merge_block == 'true'
+        run: |
+          echo "🚫 Merge is blocked because the version number must be greater than the latest release."
+          exit 1
