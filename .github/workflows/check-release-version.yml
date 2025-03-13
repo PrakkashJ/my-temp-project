@@ -64,3 +64,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --body "🚫 **Merge Blocked:** The version in package.json (${{ steps.version.outputs.version }}) is not greater than the latest release (${{ steps.latest-release.outputs.latest_version }}). Please update the version."
+          
