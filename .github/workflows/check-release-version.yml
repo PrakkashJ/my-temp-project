@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write  # Allows posting a status check comment
+  pull-requests: write
 
 jobs:
   check-version-greater:
