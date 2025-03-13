@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: write  # Allows posting a status check comment
 
 jobs:
   check-version-greater:
@@ -45,7 +45,6 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           LATEST_VERSION="${{ steps.latest-release.outputs.latest_version }}"
           
-          # Convert versions to sortable numbers
           VERSION_NUM=$(echo "$VERSION" | awk -F. '{ printf("%d%03d%03d\n", $1, $2, $3) }')
           LATEST_VERSION_NUM=$(echo "$LATEST_VERSION" | awk -F. '{ printf("%d%03d%03d\n", $1, $2, $3) }')
 
@@ -53,16 +52,15 @@ jobs:
           echo "Latest Release: $LATEST_VERSION ($LATEST_VERSION_NUM)"
 
           if [ "$VERSION_NUM" -le "$LATEST_VERSION_NUM" ]; then
-            echo "❌ The version in package.json ($VERSION) is not greater than the latest release ($LATEST_VERSION)."
             echo "merge_block=true" >> $GITHUB_OUTPUT
             exit 1
           else
-            echo "✅ The version in package.json ($VERSION) is valid."
             echo "merge_block=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Block Merge (If Version is Not Greater)
+      - name: Post failure comment if version is not greater
         if: steps.compare.outputs.merge_block == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🚫 Merge is blocked because the version number must be greater than the latest release."
-          exit 1
+          gh pr comment ${{ github.event.pull_request.number }} --body "🚫 **Merge Blocked:** The version in package.json (${{ steps.version.outputs.version }}) is not greater than the latest release (${{ steps.latest-release.outputs.latest_version }}). Please update the version."
